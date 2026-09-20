@@ -1,10 +1,10 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
+from core.email import send_email_mock
 from modules.auth.exceptions import VerificationCooldownError
 from modules.auth.models import User, UserVerificationCode
 from modules.auth.repositories import (
@@ -12,14 +12,6 @@ from modules.auth.repositories import (
     verification_code_repository,
 )
 from modules.auth.types import VerificationPurpose
-
-
-def send_email_mock(to: str, subject: str, body: str) -> None:
-    """Console-printed stand-in for real email delivery. Reused as-is (or
-    extracted to a shared place) once the realtime module's mocked
-    notifications exist."""
-    logger.info(f"[MOCK EMAIL] To: {to} | Subject: {subject}\n{body}")
-
 
 _SEND_COPY: dict[VerificationPurpose, tuple[str, str]] = {
     VerificationPurpose.EMAIL_VERIFICATION: ("Verify your email", "verification code"),
