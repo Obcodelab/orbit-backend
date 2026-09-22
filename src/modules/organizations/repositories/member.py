@@ -54,29 +54,26 @@ class OrganizationMemberRepository(BaseRepository[OrganizationMember]):
         return await self.flush_and_refresh(session, member)
 
     async def get_for_org(
-        self, session: AsyncSession, *, org_id: UUID
-    ) -> list[OrganizationMember]:
-        """Members of an org, each with `.user` eager-loaded — the members
-        list is always rendered with the underlying user's name/email, so
-        this avoids a lazy-load-per-row N+1 in an async context."""
-        stmt = (
-            select(self.model)
-            .where(self.model.org_id == org_id)
-            .options(selectinload(self.model.user))
-        )
+        self, session: AsyncSession, *, org_id: UUID, limit: int, offset: int
+    ) -> tuple[list[OrganizationMember], int]:
+        stmt = select(self.model).where(self.model.org_id == org_id)
+        total = await self._count(session, stmt)
+        stmt = stmt.options(selectinload(self.model.user)).limit(limit).offset(offset)
         result = await session.execute(stmt)
-        return list(result.scalars().all())
+        return list(result.scalars().all()), total
 
     async def get_for_user(
-        self, session: AsyncSession, *, user_id: UUID
-    ) -> list[OrganizationMember]:
+        self, session: AsyncSession, *, user_id: UUID, limit: int, offset: int
+    ) -> tuple[list[OrganizationMember], int]:
+        stmt = select(self.model).where(self.model.user_id == user_id)
+        total = await self._count(session, stmt)
         stmt = (
-            select(self.model)
-            .where(self.model.user_id == user_id)
-            .options(selectinload(self.model.organization))
+            stmt.options(selectinload(self.model.organization))
+            .limit(limit)
+            .offset(offset)
         )
         result = await session.execute(stmt)
-        return list(result.scalars().all())
+        return list(result.scalars().all()), total
 
 
 organization_member_repository = OrganizationMemberRepository()

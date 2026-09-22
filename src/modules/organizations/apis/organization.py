@@ -2,14 +2,17 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
 
-from core.dependencies import AuthenticatedUser, DBSession
+from core.dependencies import AuthenticatedUser, DBSession, PaginationParams
+from core.pagination import Page
 from modules.organizations.dependencies import AdminOrOwner, AnyMember, OwnerOnly
 from modules.organizations.exceptions import (
     AlreadyInvitedError,
     AlreadyMemberError,
     CannotChangeOwnerRoleError,
     CannotRemoveOwnerError,
+    MemberOwnsProjectsError,
     MembershipNotFoundError,
+    OrganizationHasProjectsError,
 )
 from modules.organizations.repositories import organization_repository
 from modules.organizations.schemas import (
@@ -43,9 +46,11 @@ async def create_organization(
 
 @organization_router.get("")
 async def list_my_organizations(
-    user: AuthenticatedUser, session: DBSession
-) -> list[MyOrganizationResponse]:
-    return await organization_service.list_for_user(session, user_id=user.id)
+    user: AuthenticatedUser, session: DBSession, pagination: PaginationParams
+) -> Page[MyOrganizationResponse]:
+    return await organization_service.list_for_user(
+        session, user_id=user.id, limit=pagination.limit, offset=pagination.offset
+    )
 
 
 @organization_router.get("/{org_id}")
@@ -72,7 +77,13 @@ async def update_organization(
 async def delete_organization(
     org_id: UUID, session: DBSession, membership: OwnerOnly
 ) -> None:
-    await organization_service.delete_organization(session, org_id=org_id)
+    try:
+        await organization_service.delete_organization(session, org_id=org_id)
+    except OrganizationHasProjectsError:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This organization still has projects — delete those first",
+        )
 
 
 @organization_router.post("/{org_id}/members", status_code=status.HTTP_201_CREATED)
@@ -106,9 +117,14 @@ async def invite_member(
 
 @organization_router.get("/{org_id}/members")
 async def list_members(
-    org_id: UUID, session: DBSession, membership: AnyMember
-) -> list[OrganizationMemberResponse]:
-    return await organization_member_service.list_for_org(session, org_id=org_id)
+    org_id: UUID,
+    session: DBSession,
+    membership: AnyMember,
+    pagination: PaginationParams,
+) -> Page[OrganizationMemberResponse]:
+    return await organization_member_service.list_for_org(
+        session, org_id=org_id, limit=pagination.limit, offset=pagination.offset
+    )
 
 
 @organization_router.get("/{org_id}/members/{user_id}")
@@ -168,4 +184,9 @@ async def remove_member(
     except CannotRemoveOwnerError:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, "The organization's owner cannot be removed"
+        )
+    except MemberOwnsProjectsError:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "User owns one or more projects in this organization — resolve those first",
         )

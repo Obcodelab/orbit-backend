@@ -4,3 +4,4 @@ side effect. Add one line per module as it's built."""
 
 from modules.auth import models as auth_models  # noqa: F401
 from modules.organizations import models as organizations_models  # noqa: F401
+from modules.projects import models as projects_models  # noqa: F401

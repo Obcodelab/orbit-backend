@@ -23,3 +23,16 @@ class CannotRemoveOwnerError(Exception):
 class CannotChangeOwnerRoleError(Exception):
     """The org's owner's role can't be changed — same reason as removal:
     no ownership-transfer flow exists to fall back on."""
+
+
+class MemberOwnsProjectsError(Exception):
+    """The target user owns one or more projects in this org — removing
+    them would leave those projects ownerless, with no transfer flow to
+    fall back on. Resolve the project(s) first (delete or reassign, once
+    that exists)."""
+
+
+class OrganizationHasProjectsError(Exception):
+    """The org still has projects — deletion is blocked rather than
+    cascading through them, so losing whole projects is never a silent
+    side effect of one org-delete call."""

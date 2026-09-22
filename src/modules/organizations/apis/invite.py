@@ -2,7 +2,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
 
-from core.dependencies import AuthenticatedUser, DBSession
+from core.dependencies import AuthenticatedUser, DBSession, PaginationParams
+from core.pagination import Page
 from modules.organizations.dependencies import AdminOrOwner
 from modules.organizations.exceptions import InviteNotFoundError
 from modules.organizations.schemas import (
@@ -19,9 +20,11 @@ invite_router = APIRouter(prefix="/organizations", tags=["Organizations"])
 
 @invite_router.get("/invites")
 async def list_my_invites(
-    user: AuthenticatedUser, session: DBSession
-) -> list[MyInviteResponse]:
-    return await organization_invite_service.list_for_user(session, email=user.email)
+    user: AuthenticatedUser, session: DBSession, pagination: PaginationParams
+) -> Page[MyInviteResponse]:
+    return await organization_invite_service.list_for_user(
+        session, email=user.email, limit=pagination.limit, offset=pagination.offset
+    )
 
 
 @invite_router.post("/invites/{invite_id}/accept")
@@ -52,9 +55,14 @@ async def decline_invite(
 
 @invite_router.get("/{org_id}/invites")
 async def list_org_invites(
-    org_id: UUID, session: DBSession, membership: AdminOrOwner
-) -> list[OrgInviteResponse]:
-    return await organization_invite_service.list_for_org(session, org_id=org_id)
+    org_id: UUID,
+    session: DBSession,
+    membership: AdminOrOwner,
+    pagination: PaginationParams,
+) -> Page[OrgInviteResponse]:
+    return await organization_invite_service.list_for_org(
+        session, org_id=org_id, limit=pagination.limit, offset=pagination.offset
+    )
 
 
 @invite_router.delete(

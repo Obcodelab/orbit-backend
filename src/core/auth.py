@@ -22,6 +22,9 @@ from modules.auth.repositories import blacklisted_token_repository, user_reposit
 from modules.organizations.models import OrganizationMember
 from modules.organizations.repositories import organization_member_repository
 from modules.organizations.types import OrganizationRole
+from modules.projects.models import ProjectMember
+from modules.projects.repositories import project_member_repository
+from modules.projects.types import ProjectRole
 
 _security = HTTPBearer()
 
@@ -89,6 +92,35 @@ def require_role(
 
         membership = await organization_member_repository.get_membership(
             session, org_id=UUID(raw_org_id), user_id=user.id
+        )
+        if not membership or membership.role not in allowed_roles:
+            raise forbidden
+
+        return membership
+
+    return dependency
+
+
+def require_project_role(
+    *allowed_roles: ProjectRole,
+) -> Callable[..., Coroutine[Any, Any, ProjectMember]]:
+    """Project-scoped authorization for routes with a `{project_id}` path
+    param. Same shape as `require_role`, checking `ProjectMember` instead
+    of `OrganizationMember` — project role is independent of org role."""
+
+    async def dependency(
+        request: Request,
+        user: User = Depends(get_current_user),
+        session: AsyncSession = Depends(get_session),
+    ) -> ProjectMember:
+        forbidden = HTTPException(status.HTTP_403_FORBIDDEN, "Insufficient permissions")
+
+        raw_project_id = request.path_params.get("project_id")
+        if not raw_project_id:
+            raise forbidden
+
+        membership = await project_member_repository.get_membership(
+            session, project_id=UUID(raw_project_id), user_id=user.id
         )
         if not membership or membership.role not in allowed_roles:
             raise forbidden

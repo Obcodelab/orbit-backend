@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import Select, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import BaseModel
@@ -11,6 +11,14 @@ class BaseRepository[T: BaseModel]:
     add only what's actually specific to that entity."""
 
     model: type[T]
+
+    async def _count(self, session: AsyncSession, stmt: Select) -> int:
+        """Row count for a not-yet-limited select — used by paginated
+        list methods before `.limit()`/`.offset()` are applied."""
+        result = await session.execute(
+            select(func.count()).select_from(stmt.subquery())
+        )
+        return result.scalar_one()
 
     async def get_by_id(self, session: AsyncSession, id: UUID) -> T | None:
         return await session.get(self.model, id)

@@ -24,7 +24,7 @@ async def test_list_my_invites_shows_pending_invite(
     response = await client.get(f"{ORGS}/invites", headers=invitee.headers)
 
     assert response.status_code == 200
-    invites = response.json()
+    invites = response.json()["items"]
     assert len(invites) == 1
     assert invites[0]["organization"]["name"] == "Acme Inc"
     assert invites[0]["role"] == "member"
@@ -37,7 +37,7 @@ async def test_list_my_invites_empty_when_none(
     response = await client.get(f"{ORGS}/invites", headers=authenticated_user.headers)
 
     assert response.status_code == 200
-    assert response.json() == []
+    assert response.json()["items"] == []
 
 
 async def test_accept_invite_creates_membership(
@@ -60,12 +60,14 @@ async def test_accept_invite_creates_membership(
 
     members = (
         await client.get(f"{ORGS}/{org['org_id']}/members", headers=owner.headers)
-    ).json()
+    ).json()["items"]
     emails = {m["user"]["email"] for m in members}
     assert invitee.user.email in emails
 
     # accepted invite is gone
-    remaining = (await client.get(f"{ORGS}/invites", headers=invitee.headers)).json()
+    remaining = (await client.get(f"{ORGS}/invites", headers=invitee.headers)).json()[
+        "items"
+    ]
     assert remaining == []
 
 
@@ -112,12 +114,14 @@ async def test_decline_invite_removes_it(
     )
     assert response.status_code == 204
 
-    remaining = (await client.get(f"{ORGS}/invites", headers=invitee.headers)).json()
+    remaining = (await client.get(f"{ORGS}/invites", headers=invitee.headers)).json()[
+        "items"
+    ]
     assert remaining == []
 
     members = (
         await client.get(f"{ORGS}/{org['org_id']}/members", headers=owner.headers)
-    ).json()
+    ).json()["items"]
     assert len(members) == 1  # just the owner — decline never creates a member
 
 
@@ -170,7 +174,7 @@ async def test_list_org_invites_shows_pending_invite(
     )
 
     assert response.status_code == 200
-    invites = response.json()
+    invites = response.json()["items"]
     assert len(invites) == 1
     assert invites[0]["email"] == invitee.user.email
 
@@ -194,7 +198,7 @@ async def test_invite_unregistered_email_appears_in_org_invites(
 
     invites = (
         await client.get(f"{ORGS}/{org['org_id']}/invites", headers=owner.headers)
-    ).json()
+    ).json()["items"]
     assert invites[0]["email"] == "never-registered@example.com"
 
 
@@ -221,7 +225,9 @@ async def test_unregistered_invitee_sees_and_accepts_invite_after_registering(
     # not visible to anyone yet — no account exists for that email
     invitee = await create_authenticated_user(email="future-member@example.com")
 
-    my_invites = (await client.get(f"{ORGS}/invites", headers=invitee.headers)).json()
+    my_invites = (await client.get(f"{ORGS}/invites", headers=invitee.headers)).json()[
+        "items"
+    ]
     assert len(my_invites) == 1
     assert my_invites[0]["organization"]["org_id"] == org["org_id"]
     assert my_invites[0]["role"] == "admin"
@@ -234,7 +240,7 @@ async def test_unregistered_invitee_sees_and_accepts_invite_after_registering(
 
     members = (
         await client.get(f"{ORGS}/{org['org_id']}/members", headers=owner.headers)
-    ).json()
+    ).json()["items"]
     emails = {m["user"]["email"] for m in members}
     assert "future-member@example.com" in emails
 
@@ -253,7 +259,9 @@ async def test_revoke_invite_removes_it(
     )
     assert response.status_code == 204
 
-    remaining = (await client.get(f"{ORGS}/invites", headers=invitee.headers)).json()
+    remaining = (await client.get(f"{ORGS}/invites", headers=invitee.headers)).json()[
+        "items"
+    ]
     assert remaining == []
 
 

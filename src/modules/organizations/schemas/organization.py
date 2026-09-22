@@ -1,10 +1,7 @@
 from pydantic import UUID7, BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from core.schemas import FROM_ORM
 from modules.organizations.types import OrganizationRole
-
-# populate_by_name lets response objects also be built with the real field
-# name (e.g. org_id=...) rather than only the ORM-matching alias (id=...).
-_FROM_ORM = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 def _reject_owner(role: OrganizationRole) -> OrganizationRole:
@@ -24,7 +21,7 @@ class OrganizationUpdateRequest(BaseModel):
 
 
 class OrganizationResponse(BaseModel):
-    model_config = _FROM_ORM
+    model_config = FROM_ORM
 
     org_id: UUID7 = Field(validation_alias="id")
     name: str
@@ -36,7 +33,7 @@ class MyOrganizationResponse(OrganizationResponse):
 
 
 class MemberUserSummary(BaseModel):
-    model_config = _FROM_ORM
+    model_config = FROM_ORM
 
     user_id: UUID7 = Field(validation_alias="id")
     email: EmailStr
@@ -47,8 +44,6 @@ class MemberUserSummary(BaseModel):
 class OrganizationMemberResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    member_id: UUID7 = Field(validation_alias="id")
-    org_id: UUID7
     role: OrganizationRole
     user: MemberUserSummary
 

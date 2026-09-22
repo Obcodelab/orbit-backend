@@ -42,28 +42,30 @@ class OrganizationInviteRepository(BaseRepository[OrganizationInvite]):
         return result.scalar_one_or_none()
 
     async def get_for_email(
-        self, session: AsyncSession, *, email: str
-    ) -> list[OrganizationInvite]:
+        self, session: AsyncSession, *, email: str, limit: int, offset: int
+    ) -> tuple[list[OrganizationInvite], int]:
+        stmt = select(self.model).where(self.model.email == email)
+        total = await self._count(session, stmt)
         stmt = (
-            select(self.model)
-            .where(self.model.email == email)
-            .options(
+            stmt.options(
                 selectinload(self.model.organization), selectinload(self.model.inviter)
             )
+            .limit(limit)
+            .offset(offset)
         )
         result = await session.execute(stmt)
-        return list(result.scalars().all())
+        return list(result.scalars().all()), total
 
     async def get_for_org(
-        self, session: AsyncSession, *, org_id: UUID
-    ) -> list[OrganizationInvite]:
+        self, session: AsyncSession, *, org_id: UUID, limit: int, offset: int
+    ) -> tuple[list[OrganizationInvite], int]:
+        stmt = select(self.model).where(self.model.org_id == org_id)
+        total = await self._count(session, stmt)
         stmt = (
-            select(self.model)
-            .where(self.model.org_id == org_id)
-            .options(selectinload(self.model.inviter))
+            stmt.options(selectinload(self.model.inviter)).limit(limit).offset(offset)
         )
         result = await session.execute(stmt)
-        return list(result.scalars().all())
+        return list(result.scalars().all()), total
 
 
 organization_invite_repository = OrganizationInviteRepository()

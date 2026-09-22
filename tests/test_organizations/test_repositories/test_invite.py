@@ -130,10 +130,11 @@ async def test_get_for_email_eager_loads_organization_and_inviter(
         invited_by=owner.id,
     )
 
-    invites = await organization_invite_repository.get_for_email(
-        db_session, email="invitee6@example.com"
+    invites, total = await organization_invite_repository.get_for_email(
+        db_session, email="invitee6@example.com", limit=20, offset=0
     )
 
+    assert total == 1
     assert len(invites) == 1
     assert invites[0].organization.name == "Test Org"
     assert invites[0].inviter.email == "inv-owner6@example.com"
@@ -150,10 +151,11 @@ async def test_get_for_org_eager_loads_inviter(db_session: AsyncSession):
         invited_by=owner.id,
     )
 
-    invites = await organization_invite_repository.get_for_org(
-        db_session, org_id=org.id
+    invites, total = await organization_invite_repository.get_for_org(
+        db_session, org_id=org.id, limit=20, offset=0
     )
 
+    assert total == 1
     assert len(invites) == 1
     assert invites[0].email == "invitee7@example.com"
     assert invites[0].inviter.email == "inv-owner7@example.com"

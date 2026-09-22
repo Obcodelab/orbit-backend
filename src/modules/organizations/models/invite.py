@@ -16,11 +16,9 @@ if TYPE_CHECKING:
 
 
 class OrganizationInvite(BaseModel):
-    """Existence of a row means pending — accepting creates the matching
-    OrganizationMember and deletes this row; declining just deletes it.
-    Keyed by email, not user_id — the invitee doesn't need an account yet;
-    they register with this email and the invite is simply there once
-    they're a real logged-in user with a matching address."""
+    """Existence of a row means pending — accept/decline both delete it.
+    Keyed by email, not user_id, since the invitee doesn't need an
+    account yet."""
 
     __tablename__ = "organization_invites"
 

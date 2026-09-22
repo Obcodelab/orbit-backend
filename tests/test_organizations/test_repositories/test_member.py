@@ -97,10 +97,11 @@ async def test_get_for_org_eager_loads_user_for_each_member(db_session: AsyncSes
         db_session, org_id=org.id, user_id=member.id, role=OrganizationRole.MEMBER
     )
 
-    members = await organization_member_repository.get_for_org(
-        db_session, org_id=org.id
+    members, total = await organization_member_repository.get_for_org(
+        db_session, org_id=org.id, limit=20, offset=0
     )
 
+    assert total == 2
     emails = {m.user.email for m in members}
     assert emails == {"owner5@example.com", "member5@example.com"}
 
@@ -112,10 +113,11 @@ async def test_get_for_user_eager_loads_organization(db_session: AsyncSession):
         db_session, org_id=org.id, user_id=owner.id, role=OrganizationRole.OWNER
     )
 
-    memberships = await organization_member_repository.get_for_user(
-        db_session, user_id=owner.id
+    memberships, total = await organization_member_repository.get_for_user(
+        db_session, user_id=owner.id, limit=20, offset=0
     )
 
+    assert total == 1
     assert len(memberships) == 1
     assert memberships[0].organization.name == "Test Org"
 

@@ -26,12 +26,10 @@ class VerificationService:
     async def _get_sendable_code(
         self, session: AsyncSession, *, user_id: UUID, purpose: VerificationPurpose
     ) -> UserVerificationCode | None:
-        """Reuses a still-valid code rather than reissuing on every call — a
-        resend shouldn't invalidate a code the user already has open in an
-        email tab, and reuse doesn't make guessing any easier than reissuing
-        would. Within the cooldown window, returns None (caller no-ops);
-        past it but still valid, returns the existing code to resend as-is;
-        expired or missing, clears it out and mints a fresh one."""
+        """Reuses a still-valid code instead of reissuing on every call —
+        doesn't invalidate a code the user has open, and reuse is no
+        easier to guess than reissuing. Within cooldown: None (caller
+        no-ops). Expired/missing: mints a fresh one."""
         existing = await self.verification_repo.get_by(
             session, user_id=user_id, purpose=purpose
         )

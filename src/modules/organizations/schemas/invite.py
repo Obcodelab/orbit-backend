@@ -1,18 +1,18 @@
 from pydantic import UUID7, BaseModel, ConfigDict, EmailStr, Field
 
-from modules.organizations.schemas.organization import _FROM_ORM
+from core.schemas import FROM_ORM
 from modules.organizations.types import OrganizationRole
 
 
 class OrgSummary(BaseModel):
-    model_config = _FROM_ORM
+    model_config = FROM_ORM
 
     org_id: UUID7 = Field(validation_alias="id")
     name: str
 
 
 class InviterSummary(BaseModel):
-    model_config = _FROM_ORM
+    model_config = FROM_ORM
 
     user_id: UUID7 = Field(validation_alias="id")
     first_name: str

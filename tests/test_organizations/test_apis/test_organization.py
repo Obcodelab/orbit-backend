@@ -77,7 +77,7 @@ async def test_list_my_organizations_only_shows_orgs_caller_belongs_to(
 
     response = await client.get(ORGS, headers=user_a.headers)
 
-    names = {org["name"] for org in response.json()}
+    names = {org["name"] for org in response.json()["items"]}
     assert names == {"A's Org"}
 
 
@@ -88,7 +88,7 @@ async def test_list_my_organizations_includes_role(
 
     response = await client.get(ORGS, headers=authenticated_user.headers)
 
-    assert response.json()[0]["role"] == "owner"
+    assert response.json()["items"][0]["role"] == "owner"
 
 
 # --- get / rename / delete ------------------------------------------------------
@@ -172,6 +172,23 @@ async def test_delete_organization_owner_only(
     assert follow_up.status_code == 403  # membership row is gone too (cascade)
 
 
+async def test_delete_organization_blocked_when_it_has_projects(
+    client: AsyncClient, authenticated_user: AuthedUser
+):
+    org = await _create_org(client, authenticated_user)
+    await client.post(
+        f"{ORGS}/{org['org_id']}/projects",
+        json={"key": "ORB", "name": "Orbit"},
+        headers=authenticated_user.headers,
+    )
+
+    response = await client.delete(
+        f"{ORGS}/{org['org_id']}", headers=authenticated_user.headers
+    )
+
+    assert response.status_code == 409
+
+
 # --- members: invite / list -----------------------------------------------------
 
 
@@ -216,7 +233,7 @@ async def test_invite_member_creates_pending_invite_not_a_member(
     # not a member yet — only a pending invite exists until they accept
     members = (
         await client.get(f"{ORGS}/{org['org_id']}/members", headers=owner.headers)
-    ).json()
+    ).json()["items"]
     assert len(members) == 1
     assert members[0]["user"]["email"] == owner.user.email
 
@@ -315,7 +332,7 @@ async def test_list_members_returns_user_details(
     )
 
     assert response.status_code == 200
-    members = response.json()
+    members = response.json()["items"]
     assert len(members) == 1
     assert members[0]["user"]["email"] == authenticated_user.user.email
     assert members[0]["role"] == "owner"
@@ -479,8 +496,29 @@ async def test_remove_member_success(
 
     members = (
         await client.get(f"{ORGS}/{org['org_id']}/members", headers=owner.headers)
-    ).json()
+    ).json()["items"]
     assert len(members) == 1
+
+
+async def test_remove_member_blocked_when_they_own_a_project(
+    client: AsyncClient,
+    create_authenticated_user: Callable[..., Awaitable[AuthedUser]],
+):
+    owner = await create_authenticated_user()
+    member = await create_authenticated_user()
+    org = await _create_org(client, owner)
+    await _invite_and_accept(client, org["org_id"], owner, member, "admin")
+    await client.post(
+        f"{ORGS}/{org['org_id']}/projects",
+        json={"key": "ORB", "name": "Orbit"},
+        headers=member.headers,
+    )
+
+    response = await client.delete(
+        f"{ORGS}/{org['org_id']}/members/{member.user.id}", headers=owner.headers
+    )
+
+    assert response.status_code == 409
 
 
 async def test_remove_member_cannot_target_owner(
