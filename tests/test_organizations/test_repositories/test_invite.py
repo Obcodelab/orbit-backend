@@ -131,7 +131,7 @@ async def test_get_for_email_eager_loads_organization_and_inviter(
     )
 
     invites, total = await organization_invite_repository.get_for_email(
-        db_session, email="invitee6@example.com", limit=20, offset=0
+        db_session, email="invitee6@example.com", order=None, limit=20, offset=0
     )
 
     assert total == 1
@@ -152,7 +152,7 @@ async def test_get_for_org_eager_loads_inviter(db_session: AsyncSession):
     )
 
     invites, total = await organization_invite_repository.get_for_org(
-        db_session, org_id=org.id, limit=20, offset=0
+        db_session, org_id=org.id, order=None, limit=20, offset=0
     )
 
     assert total == 1

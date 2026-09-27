@@ -160,7 +160,11 @@ async def test_remove_member_cascades_to_their_project_memberships(
         owner=owner,
     )
     await project_member_service.add_member(
-        db_session, project=project, user_id=member.id, role=ProjectRole.MEMBER
+        db_session,
+        project=project,
+        user_id=member.id,
+        role=ProjectRole.MEMBER,
+        actor_id=owner.id,
     )
 
     await organization_member_service.remove_member(

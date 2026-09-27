@@ -1,5 +1,6 @@
 from uuid import UUID
 
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.repository import BaseRepository
@@ -38,6 +39,21 @@ class ProjectRepository(BaseRepository[Project]):
         for field, value in updates.items():
             setattr(project, field, value)
         return await self.flush_and_refresh(session, project)
+
+    async def increment_task_counter(
+        self, session: AsyncSession, *, project_id: UUID
+    ) -> int:
+        """Atomic UPDATE ... RETURNING — reading and incrementing in one
+        statement so two concurrent task creates in the same project can
+        never read the same counter value and collide on a task number."""
+        stmt = (
+            update(self.model)
+            .where(self.model.id == project_id)
+            .values(task_counter=self.model.task_counter + 1)
+            .returning(self.model.task_counter)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one()
 
 
 project_repository = ProjectRepository()

@@ -96,7 +96,14 @@ async def test_list_for_user_excludes_archived_by_default(db_session: AsyncSessi
     )
 
     page = await project_service.list_for_user(
-        db_session, user_id=owner.id, status_filter=None, limit=20, offset=0
+        db_session,
+        user_id=owner.id,
+        status_filter=None,
+        q=None,
+        sort=None,
+        order=None,
+        limit=20,
+        offset=0,
     )
 
     names = {r.name for r in page.items}
@@ -132,6 +139,9 @@ async def test_list_for_user_status_filter_shows_only_that_status(
         db_session,
         user_id=owner.id,
         status_filter=ProjectStatus.ARCHIVED,
+        q=None,
+        sort=None,
+        order=None,
         limit=20,
         offset=0,
     )

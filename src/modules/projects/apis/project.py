@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from core.dependencies import AuthenticatedUser, DBSession, PaginationParams
 from core.pagination import Page
+from core.types import NameSort, SortOrder
 from modules.organizations.dependencies import AdminOrOwner as OrgAdminOrOwner
 from modules.projects.dependencies import (
     AnyProjectMember,
@@ -68,11 +69,17 @@ async def list_my_projects(
     session: DBSession,
     pagination: PaginationParams,
     status_filter: ProjectStatus | None = Query(default=None, alias="status"),
+    q: str | None = Query(default=None),
+    sort: NameSort | None = Query(default=None),
+    order: SortOrder | None = Query(default=None),
 ) -> Page[MyProjectResponse]:
     return await project_service.list_for_user(
         session,
         user_id=user.id,
         status_filter=status_filter,
+        q=q,
+        sort=sort,
+        order=order,
         limit=pagination.limit,
         offset=pagination.offset,
     )
@@ -130,7 +137,11 @@ async def add_project_member(
     project = await project_repository.get_by_id(session, project_id)
     try:
         return await project_member_service.add_member(
-            session, project=project, user_id=body.user_id, role=body.role
+            session,
+            project=project,
+            user_id=body.user_id,
+            role=body.role,
+            actor_id=membership.user_id,
         )
     except NotOrgMemberError:
         raise HTTPException(
@@ -153,9 +164,16 @@ async def list_project_members(
     session: DBSession,
     membership: AnyProjectMember,
     pagination: PaginationParams,
+    q: str | None = Query(default=None),
+    order: SortOrder | None = Query(default=None),
 ) -> Page[ProjectMemberResponse]:
     return await project_member_service.list_for_project(
-        session, project_id=project_id, limit=pagination.limit, offset=pagination.offset
+        session,
+        project_id=project_id,
+        q=q,
+        order=order,
+        limit=pagination.limit,
+        offset=pagination.offset,
     )
 
 

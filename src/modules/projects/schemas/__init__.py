@@ -1,3 +1,4 @@
+from .activity import ActivityLogEntryResponse
 from .project import (
     AddProjectMemberRequest,
     MyProjectResponse,
@@ -16,4 +17,5 @@ __all__ = [
     "ProjectResponse",
     "ProjectUpdateRequest",
     "UpdateProjectMemberRoleRequest",
+    "ActivityLogEntryResponse",
 ]

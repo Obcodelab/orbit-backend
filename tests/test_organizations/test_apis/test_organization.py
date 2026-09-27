@@ -338,6 +338,26 @@ async def test_list_members_returns_user_details(
     assert members[0]["role"] == "owner"
 
 
+async def test_list_members_search_by_email(
+    client: AsyncClient,
+    create_authenticated_user: Callable[..., Awaitable[AuthedUser]],
+):
+    owner = await create_authenticated_user()
+    member = await create_authenticated_user(email="findme-orgsearch@example.com")
+    org = await _create_org(client, owner)
+    await _invite_and_accept(client, org["org_id"], owner, member)
+
+    response = await client.get(
+        f"{ORGS}/{org['org_id']}/members",
+        params={"q": "findme"},
+        headers=owner.headers,
+    )
+
+    items = response.json()["items"]
+    assert len(items) == 1
+    assert items[0]["user"]["email"] == "findme-orgsearch@example.com"
+
+
 async def test_get_member_requires_membership(
     client: AsyncClient,
     create_authenticated_user: Callable[..., Awaitable[AuthedUser]],

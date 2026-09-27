@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.pagination import Page
+from core.types import SortOrder
 from modules.organizations.exceptions import (
     CannotChangeOwnerRoleError,
     CannotRemoveOwnerError,
@@ -21,6 +22,7 @@ from modules.projects.repositories import (
     project_member_repository,
     project_repository,
 )
+from modules.tasks.repositories import TaskAssigneeRepository, task_assignee_repository
 
 
 class OrganizationMemberService:
@@ -29,16 +31,25 @@ class OrganizationMemberService:
         member_repo: OrganizationMemberRepository,
         project_repo: ProjectRepository,
         project_member_repo: ProjectMemberRepository,
+        task_assignee_repo: TaskAssigneeRepository,
     ) -> None:
         self.member_repo = member_repo
         self.project_repo = project_repo
         self.project_member_repo = project_member_repo
+        self.task_assignee_repo = task_assignee_repo
 
     async def list_for_org(
-        self, session: AsyncSession, *, org_id: UUID, limit: int, offset: int
+        self,
+        session: AsyncSession,
+        *,
+        org_id: UUID,
+        q: str | None,
+        order: SortOrder | None,
+        limit: int,
+        offset: int,
     ) -> Page[OrganizationMemberResponse]:
         members, total = await self.member_repo.get_for_org(
-            session, org_id=org_id, limit=limit, offset=offset
+            session, org_id=org_id, q=q, order=order, limit=limit, offset=offset
         )
         return Page(
             items=[OrganizationMemberResponse.model_validate(m) for m in members],
@@ -75,12 +86,12 @@ class OrganizationMemberService:
             raise MemberOwnsProjectsError
 
         await self.member_repo.remove_member(session, org_id=org_id, user_id=user_id)
-
-        org_projects = await self.project_repo.get_all_by(session, org_id=org_id)
-        for project in org_projects:
-            await self.project_member_repo.remove_member(
-                session, project_id=project.id, user_id=user_id
-            )
+        await self.project_member_repo.remove_for_org(
+            session, org_id=org_id, user_id=user_id
+        )
+        await self.task_assignee_repo.remove_for_org(
+            session, org_id=org_id, user_id=user_id
+        )
 
     async def update_role(
         self,
@@ -110,4 +121,5 @@ organization_member_service = OrganizationMemberService(
     member_repo=organization_member_repository,
     project_repo=project_repository,
     project_member_repo=project_member_repository,
+    task_assignee_repo=task_assignee_repository,
 )

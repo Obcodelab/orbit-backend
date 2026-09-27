@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.email import send_email_mock
 from core.pagination import Page
+from core.types import SortOrder
 from modules.auth.models import User
 from modules.auth.repositories import UserRepository, user_repository
 from modules.organizations.exceptions import (
@@ -74,19 +75,31 @@ class OrganizationInviteService:
         return OrgInviteResponse.model_validate(invite)
 
     async def list_for_user(
-        self, session: AsyncSession, *, email: str, limit: int, offset: int
+        self,
+        session: AsyncSession,
+        *,
+        email: str,
+        order: SortOrder | None,
+        limit: int,
+        offset: int,
     ) -> Page[MyInviteResponse]:
         invites, total = await self.invite_repo.get_for_email(
-            session, email=email, limit=limit, offset=offset
+            session, email=email, order=order, limit=limit, offset=offset
         )
         items = [MyInviteResponse.model_validate(i) for i in invites]
         return Page(items=items, total=total, limit=limit, offset=offset)
 
     async def list_for_org(
-        self, session: AsyncSession, *, org_id: UUID, limit: int, offset: int
+        self,
+        session: AsyncSession,
+        *,
+        org_id: UUID,
+        order: SortOrder | None,
+        limit: int,
+        offset: int,
     ) -> Page[OrgInviteResponse]:
         invites, total = await self.invite_repo.get_for_org(
-            session, org_id=org_id, limit=limit, offset=offset
+            session, org_id=org_id, order=order, limit=limit, offset=offset
         )
         items = [OrgInviteResponse.model_validate(i) for i in invites]
         return Page(items=items, total=total, limit=limit, offset=offset)

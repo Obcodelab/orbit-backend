@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from core.repository import BaseRepository
+from core.types import SortOrder
 from modules.organizations.models import OrganizationInvite
 from modules.organizations.types import OrganizationRole
 
@@ -42,10 +43,22 @@ class OrganizationInviteRepository(BaseRepository[OrganizationInvite]):
         return result.scalar_one_or_none()
 
     async def get_for_email(
-        self, session: AsyncSession, *, email: str, limit: int, offset: int
+        self,
+        session: AsyncSession,
+        *,
+        email: str,
+        order: SortOrder | None,
+        limit: int,
+        offset: int,
     ) -> tuple[list[OrganizationInvite], int]:
         stmt = select(self.model).where(self.model.email == email)
         total = await self._count(session, stmt)
+        stmt = self._apply_order(
+            stmt,
+            order=order,
+            column=self.model.created_at,
+            default_order=SortOrder.DESC,
+        )
         stmt = (
             stmt.options(
                 selectinload(self.model.organization), selectinload(self.model.inviter)
@@ -57,10 +70,22 @@ class OrganizationInviteRepository(BaseRepository[OrganizationInvite]):
         return list(result.scalars().all()), total
 
     async def get_for_org(
-        self, session: AsyncSession, *, org_id: UUID, limit: int, offset: int
+        self,
+        session: AsyncSession,
+        *,
+        org_id: UUID,
+        order: SortOrder | None,
+        limit: int,
+        offset: int,
     ) -> tuple[list[OrganizationInvite], int]:
         stmt = select(self.model).where(self.model.org_id == org_id)
         total = await self._count(session, stmt)
+        stmt = self._apply_order(
+            stmt,
+            order=order,
+            column=self.model.created_at,
+            default_order=SortOrder.DESC,
+        )
         stmt = (
             stmt.options(selectinload(self.model.inviter)).limit(limit).offset(offset)
         )

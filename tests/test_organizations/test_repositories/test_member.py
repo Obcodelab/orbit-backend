@@ -3,6 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.security import hash_password
+from core.types import NameSort
 from modules.auth.models import User
 from modules.auth.repositories import user_repository
 from modules.auth.types import LoginMethod
@@ -24,9 +25,9 @@ async def _make_user(db_session: AsyncSession, email: str) -> User:
     )
 
 
-async def _make_org(db_session: AsyncSession, owner_id) -> object:
+async def _make_org(db_session: AsyncSession, owner_id, name="Test Org") -> object:
     return await organization_repository.create_organization(
-        db_session, name="Test Org", owner_id=owner_id
+        db_session, name=name, owner_id=owner_id
     )
 
 
@@ -98,7 +99,7 @@ async def test_get_for_org_eager_loads_user_for_each_member(db_session: AsyncSes
     )
 
     members, total = await organization_member_repository.get_for_org(
-        db_session, org_id=org.id, limit=20, offset=0
+        db_session, org_id=org.id, q=None, order=None, limit=20, offset=0
     )
 
     assert total == 2
@@ -114,12 +115,83 @@ async def test_get_for_user_eager_loads_organization(db_session: AsyncSession):
     )
 
     memberships, total = await organization_member_repository.get_for_user(
-        db_session, user_id=owner.id, limit=20, offset=0
+        db_session, user_id=owner.id, q=None, sort=None, order=None, limit=20, offset=0
     )
 
     assert total == 1
     assert len(memberships) == 1
     assert memberships[0].organization.name == "Test Org"
+
+
+async def test_get_for_org_search_matches_member_email(db_session: AsyncSession):
+    owner = await _make_user(db_session, "owner-search1@example.com")
+    member = await _make_user(db_session, "findme-search1@example.com")
+    org = await _make_org(db_session, owner.id)
+    await organization_member_repository.add_member(
+        db_session, org_id=org.id, user_id=owner.id, role=OrganizationRole.OWNER
+    )
+    await organization_member_repository.add_member(
+        db_session, org_id=org.id, user_id=member.id, role=OrganizationRole.MEMBER
+    )
+
+    members, total = await organization_member_repository.get_for_org(
+        db_session, org_id=org.id, q="findme", order=None, limit=20, offset=0
+    )
+
+    assert total == 1
+    assert members[0].user.email == "findme-search1@example.com"
+
+
+async def test_get_for_user_search_matches_org_name(db_session: AsyncSession):
+    owner = await _make_user(db_session, "owner-search2@example.com")
+    matching_org = await _make_org(db_session, owner.id, name="Rocket Labs")
+    other_org = await _make_org(db_session, owner.id, name="Acme Inc")
+    await organization_member_repository.add_member(
+        db_session,
+        org_id=matching_org.id,
+        user_id=owner.id,
+        role=OrganizationRole.OWNER,
+    )
+    await organization_member_repository.add_member(
+        db_session, org_id=other_org.id, user_id=owner.id, role=OrganizationRole.OWNER
+    )
+
+    memberships, total = await organization_member_repository.get_for_user(
+        db_session,
+        user_id=owner.id,
+        q="rocket",
+        sort=None,
+        order=None,
+        limit=20,
+        offset=0,
+    )
+
+    assert total == 1
+    assert memberships[0].organization.name == "Rocket Labs"
+
+
+async def test_get_for_user_sort_by_name(db_session: AsyncSession):
+    owner = await _make_user(db_session, "owner-search3@example.com")
+    org_b = await _make_org(db_session, owner.id, name="B Org")
+    org_a = await _make_org(db_session, owner.id, name="A Org")
+    await organization_member_repository.add_member(
+        db_session, org_id=org_b.id, user_id=owner.id, role=OrganizationRole.OWNER
+    )
+    await organization_member_repository.add_member(
+        db_session, org_id=org_a.id, user_id=owner.id, role=OrganizationRole.OWNER
+    )
+
+    memberships, _ = await organization_member_repository.get_for_user(
+        db_session,
+        user_id=owner.id,
+        q=None,
+        sort=NameSort.NAME,
+        order=None,
+        limit=20,
+        offset=0,
+    )
+
+    assert [m.organization.name for m in memberships] == ["A Org", "B Org"]
 
 
 async def test_remove_member_deletes_row(db_session: AsyncSession):

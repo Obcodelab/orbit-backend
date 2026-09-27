@@ -56,7 +56,11 @@ async def test_add_member_raises_when_not_an_org_member(db_session: AsyncSession
 
     with pytest.raises(NotOrgMemberError):
         await project_member_service.add_member(
-            db_session, project=project, user_id=stranger.id, role=ProjectRole.MEMBER
+            db_session,
+            project=project,
+            user_id=stranger.id,
+            role=ProjectRole.MEMBER,
+            actor_id=owner.id,
         )
 
 
@@ -77,7 +81,11 @@ async def test_add_member_succeeds_for_org_member(db_session: AsyncSession):
     )
 
     response = await project_member_service.add_member(
-        db_session, project=project, user_id=member.id, role=ProjectRole.ADMIN
+        db_session,
+        project=project,
+        user_id=member.id,
+        role=ProjectRole.ADMIN,
+        actor_id=owner.id,
     )
 
     assert response.role == ProjectRole.ADMIN
@@ -98,7 +106,11 @@ async def test_add_member_raises_when_already_a_member(db_session: AsyncSession)
 
     with pytest.raises(AlreadyProjectMemberError):
         await project_member_service.add_member(
-            db_session, project=project, user_id=owner.id, role=ProjectRole.MEMBER
+            db_session,
+            project=project,
+            user_id=owner.id,
+            role=ProjectRole.MEMBER,
+            actor_id=owner.id,
         )
 
 
@@ -123,7 +135,11 @@ async def test_add_member_raises_when_project_archived(db_session: AsyncSession)
 
     with pytest.raises(ProjectArchivedError):
         await project_member_service.add_member(
-            db_session, project=project, user_id=member.id, role=ProjectRole.MEMBER
+            db_session,
+            project=project,
+            user_id=member.id,
+            role=ProjectRole.MEMBER,
+            actor_id=owner.id,
         )
 
 
@@ -198,7 +214,11 @@ async def test_update_role_toggles_member_to_admin(db_session: AsyncSession):
         owner=owner,
     )
     await project_member_service.add_member(
-        db_session, project=project, user_id=member.id, role=ProjectRole.MEMBER
+        db_session,
+        project=project,
+        user_id=member.id,
+        role=ProjectRole.MEMBER,
+        actor_id=owner.id,
     )
 
     response = await project_member_service.update_role(

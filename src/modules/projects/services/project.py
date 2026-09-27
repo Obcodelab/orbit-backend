@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.pagination import Page
+from core.types import NameSort, SortOrder
 from modules.auth.models import User
 from modules.projects.exceptions import DuplicateProjectKeyError
 from modules.projects.models import Project
@@ -55,6 +56,9 @@ class ProjectService:
         *,
         user_id: UUID,
         status_filter: ProjectStatus | None,
+        q: str | None,
+        sort: NameSort | None,
+        order: SortOrder | None,
         limit: int,
         offset: int,
     ) -> Page[MyProjectResponse]:
@@ -62,6 +66,9 @@ class ProjectService:
             session,
             user_id=user_id,
             status_filter=status_filter,
+            q=q,
+            sort=sort,
+            order=order,
             limit=limit,
             offset=offset,
         )

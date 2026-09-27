@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.pagination import Page
+from core.types import NameSort, SortOrder
 from modules.auth.models import User
 from modules.organizations.exceptions import OrganizationHasProjectsError
 from modules.organizations.models import Organization
@@ -40,10 +41,24 @@ class OrganizationService:
         return org
 
     async def list_for_user(
-        self, session: AsyncSession, *, user_id: UUID, limit: int, offset: int
+        self,
+        session: AsyncSession,
+        *,
+        user_id: UUID,
+        q: str | None,
+        sort: NameSort | None,
+        order: SortOrder | None,
+        limit: int,
+        offset: int,
     ) -> Page[MyOrganizationResponse]:
         memberships, total = await self.member_repo.get_for_user(
-            session, user_id=user_id, limit=limit, offset=offset
+            session,
+            user_id=user_id,
+            q=q,
+            sort=sort,
+            order=order,
+            limit=limit,
+            offset=offset,
         )
         items = [
             MyOrganizationResponse(

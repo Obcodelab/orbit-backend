@@ -22,15 +22,19 @@ async def _make_user(db_session: AsyncSession, email: str) -> User:
     )
 
 
-async def _make_project(db_session: AsyncSession, owner_id) -> object:
-    org = await organization_repository.create_organization(
-        db_session, name="Test Org", owner_id=owner_id
-    )
+async def _make_project(
+    db_session: AsyncSession, owner_id, org_id=None, key="ORB", name="Orbit"
+) -> object:
+    if org_id is None:
+        org = await organization_repository.create_organization(
+            db_session, name="Test Org", owner_id=owner_id
+        )
+        org_id = org.id
     return await project_repository.create_project(
         db_session,
-        org_id=org.id,
-        key="ORB",
-        name="Orbit",
+        org_id=org_id,
+        key=key,
+        name=name,
         description=None,
         owner_id=owner_id,
     )
@@ -94,7 +98,7 @@ async def test_get_for_project_eager_loads_user_for_each_member(
     )
 
     members, total = await project_member_repository.get_for_project(
-        db_session, project_id=project.id, limit=20, offset=0
+        db_session, project_id=project.id, q=None, order=None, limit=20, offset=0
     )
 
     assert total == 2
@@ -110,12 +114,71 @@ async def test_get_for_user_eager_loads_project(db_session: AsyncSession):
     )
 
     memberships, total = await project_member_repository.get_for_user(
-        db_session, user_id=owner.id, status_filter=None, limit=20, offset=0
+        db_session,
+        user_id=owner.id,
+        status_filter=None,
+        q=None,
+        sort=None,
+        order=None,
+        limit=20,
+        offset=0,
     )
 
     assert total == 1
     assert len(memberships) == 1
     assert memberships[0].project.name == "Orbit"
+
+
+async def test_get_for_project_search_matches_member_email(db_session: AsyncSession):
+    owner = await _make_user(db_session, "pmem-owner-search1@example.com")
+    member = await _make_user(db_session, "findme-search1@example.com")
+    project = await _make_project(db_session, owner.id)
+    await project_member_repository.add_member(
+        db_session, project_id=project.id, user_id=owner.id, role=ProjectRole.OWNER
+    )
+    await project_member_repository.add_member(
+        db_session, project_id=project.id, user_id=member.id, role=ProjectRole.MEMBER
+    )
+
+    members, total = await project_member_repository.get_for_project(
+        db_session, project_id=project.id, q="findme", order=None, limit=20, offset=0
+    )
+
+    assert total == 1
+    assert members[0].user.email == "findme-search1@example.com"
+
+
+async def test_get_for_user_search_matches_project_name(db_session: AsyncSession):
+    owner = await _make_user(db_session, "pmem-owner-search2@example.com")
+    org = await organization_repository.create_organization(
+        db_session, name="Org", owner_id=owner.id
+    )
+    matching = await _make_project(
+        db_session, owner.id, org_id=org.id, key="ROC", name="Rocket Launcher"
+    )
+    other = await _make_project(
+        db_session, owner.id, org_id=org.id, key="ACM", name="Acme Widget"
+    )
+    await project_member_repository.add_member(
+        db_session, project_id=matching.id, user_id=owner.id, role=ProjectRole.OWNER
+    )
+    await project_member_repository.add_member(
+        db_session, project_id=other.id, user_id=owner.id, role=ProjectRole.OWNER
+    )
+
+    memberships, total = await project_member_repository.get_for_user(
+        db_session,
+        user_id=owner.id,
+        status_filter=None,
+        q="rocket",
+        sort=None,
+        order=None,
+        limit=20,
+        offset=0,
+    )
+
+    assert total == 1
+    assert memberships[0].project.name == "Rocket Launcher"
 
 
 async def test_remove_member_deletes_row(db_session: AsyncSession):

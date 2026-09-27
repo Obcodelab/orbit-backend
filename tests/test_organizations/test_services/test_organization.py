@@ -54,7 +54,7 @@ async def test_list_for_user_includes_role_for_each_org(db_session: AsyncSession
     )
 
     page = await organization_service.list_for_user(
-        db_session, user_id=user.id, limit=20, offset=0
+        db_session, user_id=user.id, q=None, sort=None, order=None, limit=20, offset=0
     )
 
     by_name = {r.name: r.role for r in page.items}

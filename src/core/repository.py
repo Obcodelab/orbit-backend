@@ -1,9 +1,11 @@
+from enum import StrEnum
 from uuid import UUID
 
-from sqlalchemy import Select, delete, func, select
+from sqlalchemy import ColumnElement, Select, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import BaseModel
+from core.types import SortOrder
 
 
 class BaseRepository[T: BaseModel]:
@@ -19,6 +21,50 @@ class BaseRepository[T: BaseModel]:
             select(func.count()).select_from(stmt.subquery())
         )
         return result.scalar_one()
+
+    def _apply_sort(
+        self,
+        stmt: Select,
+        *,
+        sort: StrEnum | None,
+        order: SortOrder | None,
+        columns: dict[StrEnum, tuple[ColumnElement, SortOrder]],
+        default_sort: StrEnum,
+    ) -> Select:
+        """?sort=<field>&order=asc|desc against an allowlisted enum.
+        Each field carries its own natural direction (e.g. due_date
+        ascending, created_at descending), used when `order` isn't
+        given — one shared default would be wrong for some field."""
+        column, natural_order = columns[sort or default_sort]
+        direction = order or natural_order
+        return self._order_with_tiebreak(stmt, column, direction)
+
+    def _apply_order(
+        self,
+        stmt: Select,
+        *,
+        order: SortOrder | None,
+        column: ColumnElement,
+        default_order: SortOrder,
+    ) -> Select:
+        """?order=asc|desc against a single, fixed sort column — for
+        list endpoints where there's only ever one thing to sort by, so
+        offering a `sort=` field selector would be a choice with no
+        actual options."""
+        direction = order or default_order
+        return self._order_with_tiebreak(stmt, column, direction)
+
+    def _order_with_tiebreak(
+        self, stmt: Select, column: ColumnElement, direction: SortOrder
+    ) -> Select:
+        """created_at ties when rows share a transaction (now() is
+        transaction-scoped). id (UUID7, time-ordered) breaks ties
+        deterministically, in true creation order."""
+        descending = direction == SortOrder.DESC
+        return stmt.order_by(
+            column.desc() if descending else column.asc(),
+            self.model.id.desc() if descending else self.model.id.asc(),
+        )
 
     async def get_by_id(self, session: AsyncSession, id: UUID) -> T | None:
         return await session.get(self.model, id)

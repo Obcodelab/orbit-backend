@@ -1,9 +1,10 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from core.dependencies import AuthenticatedUser, DBSession, PaginationParams
 from core.pagination import Page
+from core.types import SortOrder
 from modules.organizations.dependencies import AdminOrOwner
 from modules.organizations.exceptions import InviteNotFoundError
 from modules.organizations.schemas import (
@@ -20,10 +21,17 @@ invite_router = APIRouter(prefix="/organizations", tags=["Organizations"])
 
 @invite_router.get("/invites")
 async def list_my_invites(
-    user: AuthenticatedUser, session: DBSession, pagination: PaginationParams
+    user: AuthenticatedUser,
+    session: DBSession,
+    pagination: PaginationParams,
+    order: SortOrder | None = Query(default=None),
 ) -> Page[MyInviteResponse]:
     return await organization_invite_service.list_for_user(
-        session, email=user.email, limit=pagination.limit, offset=pagination.offset
+        session,
+        email=user.email,
+        order=order,
+        limit=pagination.limit,
+        offset=pagination.offset,
     )
 
 
@@ -59,9 +67,14 @@ async def list_org_invites(
     session: DBSession,
     membership: AdminOrOwner,
     pagination: PaginationParams,
+    order: SortOrder | None = Query(default=None),
 ) -> Page[OrgInviteResponse]:
     return await organization_invite_service.list_for_org(
-        session, org_id=org_id, limit=pagination.limit, offset=pagination.offset
+        session,
+        org_id=org_id,
+        order=order,
+        limit=pagination.limit,
+        offset=pagination.offset,
     )
 
 

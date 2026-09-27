@@ -1,9 +1,10 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from core.dependencies import AuthenticatedUser, DBSession, PaginationParams
 from core.pagination import Page
+from core.types import NameSort, SortOrder
 from modules.organizations.dependencies import AdminOrOwner, AnyMember, OwnerOnly
 from modules.organizations.exceptions import (
     AlreadyInvitedError,
@@ -46,10 +47,21 @@ async def create_organization(
 
 @organization_router.get("")
 async def list_my_organizations(
-    user: AuthenticatedUser, session: DBSession, pagination: PaginationParams
+    user: AuthenticatedUser,
+    session: DBSession,
+    pagination: PaginationParams,
+    q: str | None = Query(default=None),
+    sort: NameSort | None = Query(default=None),
+    order: SortOrder | None = Query(default=None),
 ) -> Page[MyOrganizationResponse]:
     return await organization_service.list_for_user(
-        session, user_id=user.id, limit=pagination.limit, offset=pagination.offset
+        session,
+        user_id=user.id,
+        q=q,
+        sort=sort,
+        order=order,
+        limit=pagination.limit,
+        offset=pagination.offset,
     )
 
 
@@ -121,9 +133,16 @@ async def list_members(
     session: DBSession,
     membership: AnyMember,
     pagination: PaginationParams,
+    q: str | None = Query(default=None),
+    order: SortOrder | None = Query(default=None),
 ) -> Page[OrganizationMemberResponse]:
     return await organization_member_service.list_for_org(
-        session, org_id=org_id, limit=pagination.limit, offset=pagination.offset
+        session,
+        org_id=org_id,
+        q=q,
+        order=order,
+        limit=pagination.limit,
+        offset=pagination.offset,
     )
 
 
