@@ -206,11 +206,9 @@ async def test_unregistered_invitee_sees_and_accepts_invite_after_registering(
     client: AsyncClient,
     create_authenticated_user: Callable[..., Awaitable[AuthedUser]],
 ):
-    """The full cross-module round trip: invited before any account exists,
-    then registers/verifies/logs in with that exact email, and the invite
-    that was sitting there the whole time becomes visible and acceptable —
-    no auto-creation, no temporary password, nothing invite-specific
-    happens during registration itself."""
+    """Invited before any account exists, then registers/verifies with
+    that exact email — the invite becomes visible and acceptable with no
+    auto-creation or invite-specific registration step."""
     owner = await create_authenticated_user()
     org = await _create_org(client, owner)
 

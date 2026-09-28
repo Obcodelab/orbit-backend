@@ -4,11 +4,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from core.types import Environment
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=_PROJECT_ROOT / ".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=PROJECT_ROOT / ".env", extra="ignore")
 
     ENVIRONMENT: Environment = Environment.LOCAL
 
@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     RESET_TOKEN_EXPIRE_MINUTES: int
     VERIFICATION_CODE_EXPIRE_MINUTES: int
     VERIFICATION_RESEND_COOLDOWN_SECONDS: int
+    DOWNLOAD_TOKEN_EXPIRE_MINUTES: int
 
     GOOGLE_SIGNIN_CLIENT_ID: str
     GOOGLE_SIGNIN_CLIENT_SECRET: str
@@ -32,6 +33,17 @@ class Settings(BaseSettings):
 
     RATE_LIMIT_AUTH: str
     RATE_LIMIT_DEFAULT: str
+    RATE_LIMIT_UPLOAD: str
+
+    STORAGE_BACKEND: str
+    UPLOAD_DIR: str
+    SUPABASE_URL: str | None = None
+    SUPABASE_SERVICE_KEY: str | None = None
+    MAX_FILE_SIZE_MB: int
+    ALLOWED_FILE_TYPES: list[str]
+
+    GEMINI_API_KEY: str
+    EMBEDDING_MODEL: str
 
 
 settings = Settings()  # type: ignore[call-arg]

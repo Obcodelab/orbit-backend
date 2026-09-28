@@ -10,6 +10,7 @@ class TokenType(StrEnum):
     ACCESS = "access"
     REFRESH = "refresh"
     RESET = "reset"
+    DOWNLOAD = "download"
 
 
 class SortOrder(StrEnum):

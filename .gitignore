@@ -17,3 +17,6 @@ wheels/
 
 # Personal documentation
 docs/
+
+# Local file storage (STORAGE_BACKEND=local)
+uploads/

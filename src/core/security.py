@@ -75,6 +75,14 @@ def create_reset_token(claims: dict[str, Any]) -> tuple[str, datetime]:
     )
 
 
+def create_download_token(claims: dict[str, Any]) -> tuple[str, datetime]:
+    return _encode(
+        claims,
+        timedelta(minutes=settings.DOWNLOAD_TOKEN_EXPIRE_MINUTES),
+        TokenType.DOWNLOAD,
+    )
+
+
 def create_token_pair(claims: dict[str, Any]) -> dict[str, Any]:
     """Access + refresh pair for sign-up/sign-in/OAuth."""
     access_token, access_expires_at = create_access_token(claims)
