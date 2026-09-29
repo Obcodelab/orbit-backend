@@ -2,6 +2,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.security import hash_password
+from core.websocket_manager import connection_manager
 from modules.auth.models import User
 from modules.auth.repositories import user_repository
 from modules.auth.types import LoginMethod
@@ -20,6 +21,7 @@ from modules.organizations.types import OrganizationRole
 from modules.projects.repositories import project_member_repository
 from modules.projects.services import project_member_service, project_service
 from modules.projects.types import ProjectRole
+from tests.test_core.test_websocket_manager import FakeWebSocket
 
 
 async def _make_user(db_session: AsyncSession, email: str) -> User:
@@ -175,6 +177,45 @@ async def test_remove_member_cascades_to_their_project_memberships(
         db_session, project_id=project.id, user_id=member.id
     )
     assert remaining is None
+
+
+async def test_remove_member_updates_live_connection_registration(
+    db_session: AsyncSession,
+):
+    """The org-removal cascade should refresh any already-open WebSocket
+    the same way a direct project removal does, not leave it registered
+    for a project the user no longer belongs to."""
+    owner = await _make_user(db_session, "mem-owner11@example.com")
+    member = await _make_user(db_session, "mem-member11@example.com")
+    org = await organization_service.create_organization(
+        db_session, name="Org", owner=owner
+    )
+    await organization_member_repository.add_member(
+        db_session, org_id=org.id, user_id=member.id, role=OrganizationRole.MEMBER
+    )
+    project = await project_service.create_project(
+        db_session,
+        org_id=org.id,
+        key="ORB",
+        name="Orbit",
+        description=None,
+        owner=owner,
+    )
+    await project_member_service.add_member(
+        db_session,
+        project=project,
+        user_id=member.id,
+        role=ProjectRole.MEMBER,
+        actor_id=owner.id,
+    )
+    ws = FakeWebSocket()
+    await connection_manager.connect(member.id, [project.id], ws)
+
+    await organization_member_service.remove_member(
+        db_session, org_id=org.id, user_id=member.id
+    )
+
+    assert ws not in connection_manager._by_project.get(project.id, set())
 
 
 async def test_update_role_toggles_member_to_admin(db_session: AsyncSession):

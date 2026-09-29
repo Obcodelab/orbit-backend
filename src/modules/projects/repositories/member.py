@@ -63,6 +63,20 @@ class ProjectMemberRepository(BaseRepository[ProjectMember]):
         )
         await session.execute(stmt)
 
+    async def get_project_ids_for_user_in_org(
+        self, session: AsyncSession, *, org_id: UUID, user_id: UUID
+    ) -> list[UUID]:
+        """Called before remove_for_org — its bulk DELETE doesn't report
+        which projects it actually touched, but the caller needs that
+        list to refresh live WebSocket connections for each one."""
+        stmt = (
+            select(self.model.project_id)
+            .join(Project, Project.id == self.model.project_id)
+            .where(Project.org_id == org_id, self.model.user_id == user_id)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
     async def get_project_ids_for_user(
         self, session: AsyncSession, *, user_id: UUID
     ) -> list[UUID]:

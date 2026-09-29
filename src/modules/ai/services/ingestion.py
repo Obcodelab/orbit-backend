@@ -6,7 +6,7 @@ from core.database import async_session_factory
 from core.types import RealtimeEventType
 from core.websocket_manager import build_event, connection_manager
 from modules.ai.chunking import chunk_text
-from modules.ai.embeddings import get_embedding
+from modules.ai.embeddings import get_embeddings
 from modules.ai.extraction import extract_text
 from modules.ai.repositories import DocumentChunkRepository, document_chunk_repository
 from modules.files.repositories import DocumentRepository, document_repository
@@ -34,7 +34,7 @@ class IngestionService:
                 file_bytes = await get_storage_backend().read(document.storage_path)
                 text = extract_text(file_bytes=file_bytes, mime_type=document.mime_type)
                 chunks = chunk_text(text)
-                embeddings = [await get_embedding(chunk) for chunk in chunks]
+                embeddings = await get_embeddings(chunks)
 
                 await self.chunk_repo.create_chunks(
                     session,

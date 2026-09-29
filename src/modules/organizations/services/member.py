@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.pagination import Page
 from core.types import SortOrder
+from core.websocket_manager import connection_manager
 from modules.organizations.exceptions import (
     CannotChangeOwnerRoleError,
     CannotRemoveOwnerError,
@@ -85,6 +86,9 @@ class OrganizationMemberService:
         if owned_projects:
             raise MemberOwnsProjectsError
 
+        project_ids = await self.project_member_repo.get_project_ids_for_user_in_org(
+            session, org_id=org_id, user_id=user_id
+        )
         await self.member_repo.remove_member(session, org_id=org_id, user_id=user_id)
         await self.project_member_repo.remove_for_org(
             session, org_id=org_id, user_id=user_id
@@ -92,6 +96,8 @@ class OrganizationMemberService:
         await self.task_assignee_repo.remove_for_org(
             session, org_id=org_id, user_id=user_id
         )
+        for project_id in project_ids:
+            connection_manager.remove_user_from_project(project_id, user_id)
 
     async def update_role(
         self,
