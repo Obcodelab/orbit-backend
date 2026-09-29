@@ -1,15 +1,19 @@
 import asyncio
 
 from google import genai
+from google.genai import types
 
 from core.config import settings
+from modules.ai.models import EMBEDDING_DIM
 
 _client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
 
 async def _embed_once(text: str) -> list[float]:
     result = await _client.aio.models.embed_content(
-        model=settings.EMBEDDING_MODEL, contents=text
+        model=settings.EMBEDDING_MODEL,
+        contents=text,
+        config=types.EmbedContentConfig(output_dimensionality=EMBEDDING_DIM),
     )
     return result.embeddings[0].values
 

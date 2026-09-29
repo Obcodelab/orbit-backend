@@ -90,6 +90,7 @@ class DocumentService:
             storage_path=storage_path,
             content_hash=content_hash,
         )
+        await session.commit()
         return document, (existing.id if existing is not None else None)
 
     async def list_for_project(
@@ -155,8 +156,8 @@ class DocumentService:
     ) -> str | None:
         """Deletes the row and returns its storage path only if no other
         document still shares it (dedup can leave several pointing at
-        the same file) — caller must defer the storage delete until
-        this transaction commits, since an unlink can't be rolled back."""
+        the same file) — commits immediately so the background task that
+        unlinks the file never races an uncommitted delete."""
         if project.status == ProjectStatus.ARCHIVED:
             raise ProjectArchivedError
 
@@ -172,6 +173,7 @@ class DocumentService:
         remaining = await self.document_repo.count_by_storage_path(
             session, storage_path=document.storage_path, exclude_id=document.id
         )
+        await session.commit()
         return document.storage_path if remaining == 0 else None
 
 

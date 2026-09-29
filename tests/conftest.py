@@ -29,7 +29,9 @@ if not settings.TEST_DATABASE_URL:
     raise RuntimeError("TEST_DATABASE_URL must be set to run tests — see .env.example")
 
 test_engine = create_async_engine(settings.TEST_DATABASE_URL)
-TestSessionLocal = async_sessionmaker(test_engine, expire_on_commit=False)
+TestSessionLocal = async_sessionmaker(
+    expire_on_commit=False, join_transaction_mode="create_savepoint"
+)
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
@@ -47,12 +49,18 @@ async def _test_schema() -> AsyncGenerator[None]:
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncGenerator[AsyncSession]:
-    """One session per test, never committed — only the real get_session()
-    (overridden below for the duration of each test) ever commits, so
-    rolling back here is enough to undo everything the test did."""
-    async with TestSessionLocal() as session:
-        yield session
-        await session.rollback()
+    """SAVEPOINT-bound session (join_transaction_mode="create_savepoint") —
+    app code can call session.commit() mid-test and it only releases the
+    savepoint; rolling back the outer connection still undoes everything,
+    no matter how many times application code committed."""
+    async with test_engine.connect() as connection:
+        await connection.begin()
+        session = TestSessionLocal(bind=connection)
+        try:
+            yield session
+        finally:
+            await session.close()
+            await connection.rollback()
 
 
 @pytest_asyncio.fixture
