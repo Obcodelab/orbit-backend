@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.pagination import Page
 from core.types import SortOrder
+from core.websocket_manager import connection_manager
 from modules.organizations.repositories import (
     OrganizationMemberRepository,
     organization_member_repository,
@@ -66,6 +67,7 @@ class ProjectMemberService:
         member = await self.member_repo.add_member(
             session, project_id=project.id, user_id=user_id, role=role
         )
+        connection_manager.add_user_to_project(project.id, user_id)
         await self.activity_repo.log(
             session,
             org_id=project.org_id,
@@ -122,6 +124,7 @@ class ProjectMemberService:
         await self.task_assignee_repo.remove_for_project(
             session, project_id=project_id, user_id=user_id
         )
+        connection_manager.remove_user_from_project(project_id, user_id)
 
     async def update_role(
         self,

@@ -4,6 +4,8 @@ from fastapi import APIRouter, HTTPException, status
 
 from core.dependencies import AuthenticatedUser, DBSession, PaginationParams
 from core.pagination import Page
+from core.types import RealtimeEventType
+from core.websocket_manager import build_event, connection_manager
 from modules.projects.dependencies import AnyProjectMember
 from modules.tasks.exceptions import (
     CommentNotFoundError,
@@ -33,7 +35,7 @@ async def add_comment(
     membership: AnyProjectMember,
 ) -> CommentResponse:
     try:
-        return await comment_service.add_comment(
+        comment = await comment_service.add_comment(
             session,
             project_id=project_id,
             task_id=task_id,
@@ -42,6 +44,17 @@ async def add_comment(
         )
     except TaskNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+
+    await connection_manager.broadcast(
+        project_id,
+        build_event(
+            event_type=RealtimeEventType.COMMENT_ADDED,
+            project_id=project_id,
+            data=comment.model_dump(mode="json"),
+            actor_id=user.id,
+        ),
+    )
+    return comment
 
 
 @comment_router.get("/projects/{project_id}/tasks/{task_id}/comments")

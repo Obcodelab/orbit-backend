@@ -4,6 +4,7 @@ from modules.auth.router import account_router, auth_router
 from modules.files.router import files_router
 from modules.organizations.router import organizations_router
 from modules.projects.router import projects_router
+from modules.realtime.router import realtime_router
 from modules.tasks.router import tasks_router
 
 # Module routers are included here as each module is built.
@@ -14,3 +15,4 @@ api_router.include_router(organizations_router)
 api_router.include_router(projects_router)
 api_router.include_router(tasks_router)
 api_router.include_router(files_router)
+api_router.include_router(realtime_router)

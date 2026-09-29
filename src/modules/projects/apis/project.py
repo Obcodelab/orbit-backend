@@ -4,7 +4,8 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from core.dependencies import AuthenticatedUser, DBSession, PaginationParams
 from core.pagination import Page
-from core.types import NameSort, SortOrder
+from core.types import NameSort, RealtimeEventType, SortOrder
+from core.websocket_manager import build_event, connection_manager
 from modules.organizations.dependencies import AdminOrOwner as OrgAdminOrOwner
 from modules.projects.dependencies import (
     AnyProjectMember,
@@ -136,7 +137,7 @@ async def add_project_member(
 ) -> ProjectMemberResponse:
     project = await project_repository.get_by_id(session, project_id)
     try:
-        return await project_member_service.add_member(
+        member = await project_member_service.add_member(
             session,
             project=project,
             user_id=body.user_id,
@@ -156,6 +157,17 @@ async def add_project_member(
         raise HTTPException(
             status.HTTP_409_CONFLICT, "This project is archived and is read-only"
         )
+
+    await connection_manager.broadcast(
+        project_id,
+        build_event(
+            event_type=RealtimeEventType.MEMBER_JOINED,
+            project_id=project_id,
+            data=member.model_dump(mode="json"),
+            actor_id=membership.user_id,
+        ),
+    )
+    return member
 
 
 @project_router.get("/projects/{project_id}/members")

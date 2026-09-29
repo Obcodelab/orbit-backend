@@ -5,21 +5,30 @@ tool — organizations, projects, tasks, and the people working on them.
 
 ## Stack
 
-- **FastAPI** + **SQLAlchemy 2.0** (async) + **PostgreSQL**
+- **FastAPI** + **SQLAlchemy 2.0** (async) + **PostgreSQL** (+ **pgvector**)
 - **Alembic** for migrations
 - **Pydantic v2** for request/response schemas and settings
-- **PyJWT** for access/refresh/reset tokens, with a DB-backed blacklist for revocation
+- **PyJWT** for access/refresh/reset/download tokens, with a DB-backed blacklist for revocation
 - **uv** for dependency management, **ruff** for linting/formatting
 - **slowapi** for rate limiting
+- **google-genai** (Gemini) for document embeddings
+- **WebSockets** (native FastAPI/Starlette) for real-time task updates
 
 ## Project Structure
 
 ```
 src/
-├── core/          # config, database, security, auth dependency, rate limiting
+├── core/          # config, database, security, auth dependency, rate
+│                  # limiting, WebSocket connection manager, notifications
 ├── infra/         # third-party service integrations
 ├── modules/
-│   └── auth/      # apis / models / repositories / schemas / services
+│   ├── auth/          # apis / models / repositories / schemas / services
+│   ├── organizations/ # orgs, membership, email-based invites
+│   ├── projects/      # projects, members, activity log, dashboard
+│   ├── tasks/          # tasks, subtasks, comments
+│   ├── files/          # document upload/download/delete, storage backends
+│   ├── ai/             # embeddings, chunking, extraction, ingestion pipeline
+│   └── realtime/       # WS /ws/{project_id} route
 └── main.py
 alembic/           # migrations
 tests/             # mirrors src/modules, tested against a real Postgres test DB
@@ -71,7 +80,15 @@ Run `make help` for the full list — `makemigration`, `migrate`,
 - ✅ **Auth** — registration with email verification, login, JWT
   access/refresh tokens with revocation, forgot/reset password, change
   password, profile management under `/account`, Google OAuth (PKCE).
-- 🚧 **Next up** — organizations, projects, and tasks (full Kanban CRUD
-  with RBAC, comments, and activity logging).
-- ⏳ **Planned** — file uploads/ingestion, real-time updates, an AI
-  assistant.
+- ✅ **Organizations & Projects** — org/project CRUD, membership, RBAC,
+  email-based invites, project dashboard, activity timeline.
+- ✅ **Tasks** — full Kanban CRUD, subtasks, multiple assignees, status
+  transitions, comments, activity logging, pagination/sort/search.
+- ✅ **Files & AI Ingestion** — upload/list/get/download/delete with
+  swappable local/Supabase storage (Supabase backend is a stub), content-
+  hash dedup, background ingestion (extract → chunk → embed → pgvector).
+- ✅ **Real-time** — per-project WebSocket broadcasts on task events, plus
+  per-user push notifications with a mocked email fallback.
+- ⏳ **Planned** — AI assistant (retrieval + citation-backed chat over
+  ingested documents), full rate-limit coverage for AI endpoints,
+  deployment.

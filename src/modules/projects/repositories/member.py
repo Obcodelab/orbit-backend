@@ -63,6 +63,13 @@ class ProjectMemberRepository(BaseRepository[ProjectMember]):
         )
         await session.execute(stmt)
 
+    async def get_project_ids_for_user(
+        self, session: AsyncSession, *, user_id: UUID
+    ) -> list[UUID]:
+        stmt = select(self.model.project_id).where(self.model.user_id == user_id)
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
     async def get_member_user_ids(
         self, session: AsyncSession, *, project_id: UUID, user_ids: list[UUID]
     ) -> set[UUID]:

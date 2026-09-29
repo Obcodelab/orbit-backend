@@ -16,7 +16,8 @@ from core.config import settings
 from core.dependencies import AuthenticatedUser, DBSession, PaginationParams
 from core.pagination import Page
 from core.rate_limit import limiter
-from core.types import SortOrder
+from core.types import RealtimeEventType, SortOrder
+from core.websocket_manager import build_event, connection_manager
 from modules.ai.services import ingestion_service
 from modules.files.dependencies import StorageBackendDep
 from modules.files.exceptions import (
@@ -84,6 +85,16 @@ async def upload_document(
             status.HTTP_400_BAD_REQUEST, "task_id doesn't exist in this project"
         )
 
+    response = DocumentResponse.model_validate(document)
+    await connection_manager.broadcast(
+        project_id,
+        build_event(
+            event_type=RealtimeEventType.DOCUMENT_UPLOADED,
+            project_id=project_id,
+            data=response.model_dump(mode="json"),
+            actor_id=user.id,
+        ),
+    )
     if dedup_source_id is not None:
         background_tasks.add_task(
             ingestion_service.clone_or_ingest,
@@ -94,7 +105,7 @@ async def upload_document(
         background_tasks.add_task(
             ingestion_service.ingest_document, document_id=document.id
         )
-    return DocumentResponse.model_validate(document)
+    return response
 
 
 @document_router.get("/projects/{project_id}/documents")

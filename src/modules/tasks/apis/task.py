@@ -1,10 +1,12 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, status
 
 from core.dependencies import AuthenticatedUser, DBSession, PaginationParams
+from core.notifications import notify_many
 from core.pagination import Page
-from core.types import SortOrder
+from core.types import RealtimeEventType, SortOrder
+from core.websocket_manager import build_event, connection_manager
 from modules.projects.dependencies import AnyProjectMember, ProjectAdminOrOwner
 from modules.projects.exceptions import ProjectArchivedError
 from modules.projects.repositories import project_repository
@@ -33,10 +35,11 @@ async def create_task(
     user: AuthenticatedUser,
     session: DBSession,
     membership: ProjectAdminOrOwner,
+    background_tasks: BackgroundTasks,
 ) -> TaskResponse:
     project = await project_repository.get_by_id(session, project_id)
     try:
-        return await task_service.create_task(
+        task = await task_service.create_task(
             session,
             project=project,
             title=body.title,
@@ -61,6 +64,19 @@ async def create_task(
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, "parent_task_id doesn't exist in this project"
         )
+
+    event = build_event(
+        event_type=RealtimeEventType.TASK_CREATED,
+        project_id=project_id,
+        data=task.model_dump(mode="json"),
+        actor_id=user.id,
+    )
+    await connection_manager.broadcast(project_id, event)
+    if task.assignees:
+        background_tasks.add_task(
+            notify_many, [a.user_id for a in task.assignees], event
+        )
+    return task
 
 
 @task_router.get("/projects/{project_id}/tasks")
@@ -114,11 +130,12 @@ async def update_task(
     body: TaskUpdateRequest,
     session: DBSession,
     membership: ProjectAdminOrOwner,
+    background_tasks: BackgroundTasks,
 ) -> TaskResponse:
     data = body.model_dump(exclude_unset=True)
     assignee_ids = data.pop("assignee_ids", None)
     try:
-        return await task_service.update_task(
+        task, newly_added_assignees = await task_service.update_task(
             session,
             project_id=project_id,
             task_id=task_id,
@@ -137,6 +154,17 @@ async def update_task(
             status.HTTP_400_BAD_REQUEST, "parent_task_id doesn't exist in this project"
         )
 
+    event = build_event(
+        event_type=RealtimeEventType.TASK_UPDATED,
+        project_id=project_id,
+        data=task.model_dump(mode="json"),
+        actor_id=membership.user_id,
+    )
+    await connection_manager.broadcast(project_id, event)
+    if newly_added_assignees:
+        background_tasks.add_task(notify_many, newly_added_assignees, event)
+    return task
+
 
 @task_router.patch("/projects/{project_id}/tasks/{task_id}/status")
 async def update_task_status(
@@ -147,7 +175,7 @@ async def update_task_status(
     membership: AnyProjectMember,
 ) -> TaskResponse:
     try:
-        return await task_service.update_status(
+        task = await task_service.update_status(
             session,
             project_id=project_id,
             task_id=task_id,
@@ -161,6 +189,17 @@ async def update_task_status(
             status.HTTP_403_FORBIDDEN,
             "Only the task's assignees or a project admin/owner can change its status",
         )
+
+    await connection_manager.broadcast(
+        project_id,
+        build_event(
+            event_type=RealtimeEventType.TASK_STATUS_CHANGED,
+            project_id=project_id,
+            data=task.model_dump(mode="json"),
+            actor_id=membership.user_id,
+        ),
+    )
+    return task
 
 
 @task_router.delete(
@@ -177,3 +216,13 @@ async def delete_task(
         await task_service.delete_task(session, project_id=project_id, task_id=task_id)
     except TaskNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+
+    await connection_manager.broadcast(
+        project_id,
+        build_event(
+            event_type=RealtimeEventType.TASK_DELETED,
+            project_id=project_id,
+            data={"task_id": str(task_id)},
+            actor_id=membership.user_id,
+        ),
+    )

@@ -194,7 +194,10 @@ class TaskService:
         task_id: UUID,
         updates: dict,
         assignee_ids: list[UUID] | None,
-    ) -> TaskResponse:
+    ) -> tuple[TaskResponse, list[UUID]]:
+        """Returns the task plus any newly added assignee ids — callers
+        should notify only this diff, not everyone in assignee_ids, or
+        an unrelated edit re-notifies people already assigned."""
         task = await self.task_repo.get_scoped(
             session, project_id=project_id, task_id=task_id
         )
@@ -206,10 +209,15 @@ class TaskService:
                 session, project_id=project_id, parent_task_id=updates["parent_task_id"]
             )
 
+        newly_added: list[UUID] = []
         if assignee_ids is not None:
             await self._validate_assignees(
                 session, project_id=project_id, user_ids=assignee_ids
             )
+            old_assignee_ids = await self.assignee_repo.get_user_ids_for_task(
+                session, task_id=task.id
+            )
+            newly_added = [uid for uid in assignee_ids if uid not in old_assignee_ids]
             await self.assignee_repo.replace_all(
                 session, task_id=task.id, user_ids=assignee_ids
             )
@@ -220,7 +228,7 @@ class TaskService:
         task = await self.task_repo.get_scoped_with_assignees(
             session, project_id=project_id, task_id=task_id
         )
-        return _build_response(task)
+        return _build_response(task), newly_added
 
     async def update_status(
         self,

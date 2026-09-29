@@ -211,6 +211,39 @@ async def test_get_download_url_returns_fake_backend_url(
     assert response.json()["url"].startswith("https://fake-storage.test/")
 
 
+async def test_download_by_token_supports_range_requests(
+    client: AsyncClient,
+    authenticated_user: AuthedUser,
+):
+    """Deliberately doesn't request fake_storage_backend — range-request
+    handling is Starlette's FileResponse behavior against a real file on
+    disk, which the fake backend's URL scheme doesn't exercise at all."""
+    org = await _create_org(client, authenticated_user)
+    project = await _create_project(client, org["org_id"], authenticated_user)
+    document = await _upload(
+        client, project["project_id"], authenticated_user, content=b"0123456789"
+    )
+
+    url_response = await client.get(
+        f"{PROJECTS}/{project['project_id']}/documents/{document['document_id']}/download",
+        headers=authenticated_user.headers,
+    )
+    download_url = url_response.json()["url"]
+    assert download_url.startswith("/api/v1/files/download?token=")
+
+    try:
+        response = await client.get(download_url, headers={"Range": "bytes=0-4"})
+
+        assert response.status_code == 206
+        assert response.content == b"01234"
+        assert response.headers["content-range"] == "bytes 0-4/10"
+    finally:
+        await client.delete(
+            f"{PROJECTS}/{project['project_id']}/documents/{document['document_id']}",
+            headers=authenticated_user.headers,
+        )
+
+
 async def test_delete_document_requires_uploader_or_admin(
     client: AsyncClient,
     create_authenticated_user: Callable[..., Awaitable[AuthedUser]],

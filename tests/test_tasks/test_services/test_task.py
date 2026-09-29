@@ -175,7 +175,7 @@ async def test_update_task_replaces_assignees(db_session: AsyncSession):
     )
     task = await _create_task(db_session, project, owner.id, assignee_ids=[owner.id])
 
-    updated = await task_service.update_task(
+    updated, newly_added = await task_service.update_task(
         db_session,
         project_id=project.id,
         task_id=task.task_id,
@@ -184,6 +184,46 @@ async def test_update_task_replaces_assignees(db_session: AsyncSession):
     )
 
     assert {a.email for a in updated.assignees} == {member.email}
+    assert newly_added == [member.id]
+
+
+async def test_update_task_returns_no_newly_added_when_assignees_unchanged(
+    db_session: AsyncSession,
+):
+    owner = await _make_user(db_session, "tsvc-owner7b@example.com")
+    project = await _make_project(db_session, owner)
+    task = await _create_task(db_session, project, owner.id, assignee_ids=[owner.id])
+
+    _, newly_added = await task_service.update_task(
+        db_session,
+        project_id=project.id,
+        task_id=task.task_id,
+        updates={},
+        assignee_ids=[owner.id],
+    )
+
+    assert newly_added == []
+
+
+async def test_update_task_returns_no_newly_added_when_assignee_ids_not_given(
+    db_session: AsyncSession,
+):
+    """Editing an unrelated field shouldn't look like a reassignment —
+    this is exactly what would spuriously re-notify existing assignees
+    if update_task returned everyone in assignee_ids instead of a diff."""
+    owner = await _make_user(db_session, "tsvc-owner7c@example.com")
+    project = await _make_project(db_session, owner)
+    task = await _create_task(db_session, project, owner.id, assignee_ids=[owner.id])
+
+    _, newly_added = await task_service.update_task(
+        db_session,
+        project_id=project.id,
+        task_id=task.task_id,
+        updates={"title": "Renamed"},
+        assignee_ids=None,
+    )
+
+    assert newly_added == []
 
 
 async def test_update_task_raises_when_assignee_not_project_member(

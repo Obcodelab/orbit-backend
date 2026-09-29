@@ -21,6 +21,13 @@ class TaskAssigneeRepository(BaseRepository[TaskAssignee]):
         ]
         await self.add_and_flush_instances(session, instances)
 
+    async def get_user_ids_for_task(
+        self, session: AsyncSession, *, task_id: UUID
+    ) -> set[UUID]:
+        stmt = select(self.model.user_id).where(self.model.task_id == task_id)
+        result = await session.execute(stmt)
+        return set(result.scalars().all())
+
     async def replace_all(
         self, session: AsyncSession, *, task_id: UUID, user_ids: list[UUID]
     ) -> None:
