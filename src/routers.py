@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from modules.ai.router import ai_router
 from modules.auth.router import account_router, auth_router
 from modules.files.router import files_router
 from modules.organizations.router import organizations_router
@@ -15,4 +16,5 @@ api_router.include_router(organizations_router)
 api_router.include_router(projects_router)
 api_router.include_router(tasks_router)
 api_router.include_router(files_router)
+api_router.include_router(ai_router)
 api_router.include_router(realtime_router)

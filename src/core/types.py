@@ -42,3 +42,5 @@ class RealtimeEventType(StrEnum):
     DOCUMENT_INDEXED = "document.indexed"
     PRESENCE_JOINED = "presence.joined"
     PRESENCE_LEFT = "presence.left"
+    AI_ANSWER_CHUNK = "ai.answer_chunk"
+    AI_ANSWER_COMPLETE = "ai.answer_complete"

@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_AUTH: str
     RATE_LIMIT_DEFAULT: str
     RATE_LIMIT_UPLOAD: str
+    RATE_LIMIT_AI: str
 
     STORAGE_BACKEND: str
     UPLOAD_DIR: str
@@ -44,6 +45,7 @@ class Settings(BaseSettings):
 
     GEMINI_API_KEY: str
     EMBEDDING_MODEL: str
+    CHAT_MODEL: str
 
 
 settings = Settings()  # type: ignore[call-arg]
