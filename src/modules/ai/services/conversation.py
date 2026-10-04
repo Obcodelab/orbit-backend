@@ -4,7 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.pagination import Page
 from core.types import SortOrder
-from modules.ai.exceptions import ConversationNotFoundError
+from modules.ai.exceptions import ConversationNotFoundError, NotConversationOwnerError
+from modules.ai.models import AIConversation
 from modules.ai.repositories import (
     AIConversationRepository,
     AIMessageRepository,
@@ -77,6 +78,59 @@ class ConversationService:
         )
         items = [AIMessageResponse.model_validate(m) for m in messages]
         return Page(items=items, total=total, limit=limit, offset=offset)
+
+    async def _get_owned_conversation(
+        self,
+        session: AsyncSession,
+        *,
+        project_id: UUID,
+        conversation_id: UUID,
+        user_id: UUID,
+    ) -> AIConversation:
+        conversation = await self.conversation_repo.get_scoped(
+            session, project_id=project_id, conversation_id=conversation_id
+        )
+        if not conversation:
+            raise ConversationNotFoundError
+        if conversation.user_id != user_id:
+            raise NotConversationOwnerError
+        return conversation
+
+    async def update_title(
+        self,
+        session: AsyncSession,
+        *,
+        project_id: UUID,
+        conversation_id: UUID,
+        user_id: UUID,
+        title: str,
+    ) -> AIConversationResponse:
+        conversation = await self._get_owned_conversation(
+            session,
+            project_id=project_id,
+            conversation_id=conversation_id,
+            user_id=user_id,
+        )
+        conversation = await self.conversation_repo.set_title(
+            session, conversation=conversation, title=title
+        )
+        return AIConversationResponse.model_validate(conversation)
+
+    async def delete_conversation(
+        self,
+        session: AsyncSession,
+        *,
+        project_id: UUID,
+        conversation_id: UUID,
+        user_id: UUID,
+    ) -> None:
+        conversation = await self._get_owned_conversation(
+            session,
+            project_id=project_id,
+            conversation_id=conversation_id,
+            user_id=user_id,
+        )
+        await self.conversation_repo.delete_by_id(session, conversation.id)
 
 
 conversation_service = ConversationService(

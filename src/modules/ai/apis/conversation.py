@@ -7,8 +7,17 @@ from core.dependencies import AuthenticatedUser, DBSession, PaginationParams
 from core.pagination import Page
 from core.rate_limit import limiter
 from core.types import SortOrder
-from modules.ai.exceptions import AssistantUnavailableError, ConversationNotFoundError
-from modules.ai.schemas import AIConversationResponse, AIMessageResponse, AskRequest
+from modules.ai.exceptions import (
+    AssistantUnavailableError,
+    ConversationNotFoundError,
+    NotConversationOwnerError,
+)
+from modules.ai.schemas import (
+    AIConversationResponse,
+    AIMessageResponse,
+    AskRequest,
+    ConversationUpdateRequest,
+)
 from modules.ai.services import assistant_service, conversation_service
 from modules.projects.dependencies import AnyProjectMember
 from modules.projects.exceptions import ProjectArchivedError
@@ -54,6 +63,57 @@ async def list_conversations(
         limit=pagination.limit,
         offset=pagination.offset,
     )
+
+
+@conversation_router.patch("/projects/{project_id}/ai/conversations/{conversation_id}")
+async def update_conversation(
+    project_id: UUID,
+    conversation_id: UUID,
+    body: ConversationUpdateRequest,
+    user: AuthenticatedUser,
+    session: DBSession,
+    membership: AnyProjectMember,
+) -> AIConversationResponse:
+    try:
+        return await conversation_service.update_title(
+            session,
+            project_id=project_id,
+            conversation_id=conversation_id,
+            user_id=user.id,
+            title=body.title,
+        )
+    except ConversationNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found")
+    except NotConversationOwnerError:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Only the conversation's owner can rename it"
+        )
+
+
+@conversation_router.delete(
+    "/projects/{project_id}/ai/conversations/{conversation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_conversation(
+    project_id: UUID,
+    conversation_id: UUID,
+    user: AuthenticatedUser,
+    session: DBSession,
+    membership: AnyProjectMember,
+) -> None:
+    try:
+        await conversation_service.delete_conversation(
+            session,
+            project_id=project_id,
+            conversation_id=conversation_id,
+            user_id=user.id,
+        )
+    except ConversationNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found")
+    except NotConversationOwnerError:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Only the conversation's owner can delete it"
+        )
 
 
 @conversation_router.get(

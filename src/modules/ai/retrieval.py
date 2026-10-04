@@ -7,6 +7,11 @@ from modules.ai.embeddings import get_embeddings
 from modules.ai.models import DocumentChunk
 from modules.files.models import Document
 
+# top_k alone always returns the "least bad" matches, even when nothing
+# in the project is relevant. This cutoff (cosine distance; 1 = orthogonal)
+# is an unvalidated starting point — tune against real queries later.
+_MAX_RELEVANT_DISTANCE = 0.5
+
 
 async def retrieve_relevant_chunks(
     session: AsyncSession, *, project_id: UUID, query: str, top_k: int = 5
@@ -20,11 +25,12 @@ async def retrieve_relevant_chunks(
         return []
     query_embedding = embeddings[0]
 
+    distance = DocumentChunk.embedding.cosine_distance(query_embedding)
     stmt = (
         select(DocumentChunk)
         .join(Document, Document.id == DocumentChunk.document_id)
-        .where(Document.project_id == project_id)
-        .order_by(DocumentChunk.embedding.cosine_distance(query_embedding))
+        .where(Document.project_id == project_id, distance < _MAX_RELEVANT_DISTANCE)
+        .order_by(distance)
         .limit(top_k)
     )
     result = await session.execute(stmt)

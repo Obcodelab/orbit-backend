@@ -1,4 +1,4 @@
-from .conversation import AIConversationResponse
+from .conversation import AIConversationResponse, ConversationUpdateRequest
 from .message import AIMessageResponse, AskRequest, Citation
 
 __all__ = [
@@ -6,4 +6,5 @@ __all__ = [
     "AIMessageResponse",
     "AskRequest",
     "Citation",
+    "ConversationUpdateRequest",
 ]

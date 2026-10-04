@@ -11,3 +11,7 @@ class AIConversationResponse(BaseModel):
     conversation_id: UUID7 = Field(validation_alias="id")
     title: str | None
     created_at: datetime
+
+
+class ConversationUpdateRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)

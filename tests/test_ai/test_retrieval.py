@@ -13,6 +13,9 @@ from modules.organizations.repositories import organization_repository
 from modules.projects.repositories import project_repository
 
 _CLOSE = [1.0] + [0.0] * 767
+# cosine distance ~0.293 from _CLOSE — within the retrieval threshold
+_MODERATE = [1.0, 1.0] + [0.0] * 766
+# orthogonal to _CLOSE — distance 1.0, past the retrieval threshold
 _FAR = [0.0, 1.0] + [0.0] * 766
 
 
@@ -80,17 +83,69 @@ async def test_retrieve_relevant_chunks_orders_by_similarity(
         db_session,
         project=project,
         uploader_id=owner.id,
-        chunks=[("close match", _CLOSE), ("far match", _FAR)],
+        chunks=[("moderate match", _MODERATE), ("close match", _CLOSE)],
     )
 
     results = await retrieve_relevant_chunks(
         db_session, project_id=project.id, query="anything", top_k=5
     )
 
-    assert [r.content for r in results] == ["close match", "far match"]
+    assert [r.content for r in results] == ["close match", "moderate match"]
 
 
-async def test_retrieve_relevant_chunks_respects_top_k(db_session: AsyncSession):
+async def test_retrieve_relevant_chunks_filters_out_distant_matches(
+    db_session: AsyncSession, monkeypatch
+):
+    async def _query_embeds_as_close(texts: list[str]) -> list[list[float]]:
+        return [_CLOSE for _ in texts]
+
+    monkeypatch.setattr(retrieval_module, "get_embeddings", _query_embeds_as_close)
+    owner = await _make_user(db_session, "retrieval-owner4@example.com")
+    project = await _make_project(db_session, owner.id)
+    await _make_document_with_chunks(
+        db_session,
+        project=project,
+        uploader_id=owner.id,
+        chunks=[("close match", _CLOSE), ("unrelated content", _FAR)],
+    )
+
+    results = await retrieve_relevant_chunks(
+        db_session, project_id=project.id, query="anything", top_k=5
+    )
+
+    assert [r.content for r in results] == ["close match"]
+
+
+async def test_retrieve_relevant_chunks_returns_empty_when_nothing_relevant(
+    db_session: AsyncSession, monkeypatch
+):
+    async def _query_embeds_as_close(texts: list[str]) -> list[list[float]]:
+        return [_CLOSE for _ in texts]
+
+    monkeypatch.setattr(retrieval_module, "get_embeddings", _query_embeds_as_close)
+    owner = await _make_user(db_session, "retrieval-owner5@example.com")
+    project = await _make_project(db_session, owner.id)
+    await _make_document_with_chunks(
+        db_session,
+        project=project,
+        uploader_id=owner.id,
+        chunks=[("unrelated content", _FAR)],
+    )
+
+    results = await retrieve_relevant_chunks(
+        db_session, project_id=project.id, query="anything", top_k=5
+    )
+
+    assert results == []
+
+
+async def test_retrieve_relevant_chunks_respects_top_k(
+    db_session: AsyncSession, monkeypatch
+):
+    async def _query_embeds_as_close(texts: list[str]) -> list[list[float]]:
+        return [_CLOSE for _ in texts]
+
+    monkeypatch.setattr(retrieval_module, "get_embeddings", _query_embeds_as_close)
     owner = await _make_user(db_session, "retrieval-owner2@example.com")
     project = await _make_project(db_session, owner.id)
     await _make_document_with_chunks(
@@ -108,8 +163,12 @@ async def test_retrieve_relevant_chunks_respects_top_k(db_session: AsyncSession)
 
 
 async def test_retrieve_relevant_chunks_never_leaks_another_project(
-    db_session: AsyncSession,
+    db_session: AsyncSession, monkeypatch
 ):
+    async def _query_embeds_as_close(texts: list[str]) -> list[list[float]]:
+        return [_CLOSE for _ in texts]
+
+    monkeypatch.setattr(retrieval_module, "get_embeddings", _query_embeds_as_close)
     owner = await _make_user(db_session, "retrieval-owner3@example.com")
     project_a = await _make_project(db_session, owner.id)
     project_b = await _make_project(db_session, owner.id)

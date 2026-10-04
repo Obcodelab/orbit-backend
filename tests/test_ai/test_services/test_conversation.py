@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.security import hash_password
-from modules.ai.exceptions import ConversationNotFoundError
+from modules.ai.exceptions import ConversationNotFoundError, NotConversationOwnerError
 from modules.ai.services import conversation_service
 from modules.auth.models import User
 from modules.auth.repositories import user_repository
@@ -103,3 +103,80 @@ async def test_list_messages_works_for_archived_project(db_session: AsyncSession
     )
 
     assert page.total == 0
+
+
+async def test_update_title_succeeds_for_owner(db_session: AsyncSession):
+    owner = await _make_user(db_session, "conv-svc-owner5@example.com")
+    project = await _make_project(db_session, owner.id)
+    conversation = await conversation_service.create_conversation(
+        db_session, project=project, user_id=owner.id
+    )
+
+    updated = await conversation_service.update_title(
+        db_session,
+        project_id=project.id,
+        conversation_id=conversation.conversation_id,
+        user_id=owner.id,
+        title="Renamed",
+    )
+
+    assert updated.title == "Renamed"
+
+
+async def test_update_title_raises_for_non_owner(db_session: AsyncSession):
+    owner = await _make_user(db_session, "conv-svc-owner6@example.com")
+    other = await _make_user(db_session, "conv-svc-other6@example.com")
+    project = await _make_project(db_session, owner.id)
+    conversation = await conversation_service.create_conversation(
+        db_session, project=project, user_id=owner.id
+    )
+
+    with pytest.raises(NotConversationOwnerError):
+        await conversation_service.update_title(
+            db_session,
+            project_id=project.id,
+            conversation_id=conversation.conversation_id,
+            user_id=other.id,
+            title="Hijacked",
+        )
+
+
+async def test_delete_conversation_succeeds_for_owner(db_session: AsyncSession):
+    owner = await _make_user(db_session, "conv-svc-owner7@example.com")
+    project = await _make_project(db_session, owner.id)
+    conversation = await conversation_service.create_conversation(
+        db_session, project=project, user_id=owner.id
+    )
+
+    await conversation_service.delete_conversation(
+        db_session,
+        project_id=project.id,
+        conversation_id=conversation.conversation_id,
+        user_id=owner.id,
+    )
+
+    with pytest.raises(ConversationNotFoundError):
+        await conversation_service.update_title(
+            db_session,
+            project_id=project.id,
+            conversation_id=conversation.conversation_id,
+            user_id=owner.id,
+            title="Too late",
+        )
+
+
+async def test_delete_conversation_raises_for_non_owner(db_session: AsyncSession):
+    owner = await _make_user(db_session, "conv-svc-owner8@example.com")
+    other = await _make_user(db_session, "conv-svc-other8@example.com")
+    project = await _make_project(db_session, owner.id)
+    conversation = await conversation_service.create_conversation(
+        db_session, project=project, user_id=owner.id
+    )
+
+    with pytest.raises(NotConversationOwnerError):
+        await conversation_service.delete_conversation(
+            db_session,
+            project_id=project.id,
+            conversation_id=conversation.conversation_id,
+            user_id=other.id,
+        )
